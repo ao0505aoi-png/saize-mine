@@ -72,7 +72,8 @@
 // -----------------------------
 // ★ 固定するスプレッドシート URL
 // -----------------------------
-const FIXED_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSKqsI81JSubHb3Sdh-9HVDe-cV9yHzlsfLt1fw8oH-zb-cVC1Dv8dcBsZLlQRc4KHtyHtqSmeJ8gjV/pubhtml";
+// ★★ ここを変更：末尾を pub?output=csv に ★★
+const FIXED_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSKqsI81JSubHb3Sdh-9HVDe-cV9yHzlsfLt1fw8oH-zb-cVC1Dv8dcBsZLlQRc4KHtyHtqSmeJ8gjV/pub?output=csv";
 
 let items = []; // 商品データ格納
 
@@ -161,9 +162,14 @@ function runGacha() {
 }
 
 
-// ボタンのイベント
-document.getElementById("loadBtn").onclick = loadCSV;
-document.getElementById("gachaBtn").onclick = runGacha;
+// ★★ ページ読み込み時に自動実行 ★★
+window.addEventListener('DOMContentLoaded', function() {
+    // ボタンのイベント設定
+    document.getElementById("gachaBtn").onclick = runGacha;
+    
+    // データ読み込み
+    loadCSV();
+});
 
 </script>
 
