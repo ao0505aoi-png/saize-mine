@@ -37,16 +37,33 @@ function loadCSV() {
     fetch(FIXED_CSV_URL)
     .then(res => res.text())
     .then(text => {
-        items = text.trim().split("\n").slice(1).map(line => {
-            const [name, price, code] = line.split(",");
+        const lines = text.trim().split("\n");
+        
+        // ★ ヘッダー行をログ出力して確認
+        console.log("CSVヘッダー:", lines[0]);
+        
+        items = lines.slice(1).map(line => {
+            const cols = line.split(",");
+            
+            // ★ 各行もログ出力して確認
+            console.log("行データ:", cols);
+            
+            // ★★★ ここを修正：CSVの列順に合わせる ★★★
+            // 例: もし列順が「商品番号, 商品名, 価格」なら
+            // const [code, name, price] = cols;
+            
+            // 例: もし列順が「商品名, 価格, 商品番号」なら（現在のコード）
+            const [name, price, code] = cols;
+            
             return { 
-                name: name, 
-                price: Number(price), 
-                code: code 
+                name: name?.trim() || "", 
+                price: Number(price) || 0, 
+                code: code?.trim() || "" 
             };
         });
 
-        document.getElementById("result").innerHTML = "データ読み込み完了！";
+        console.log("読み込んだアイテム:", items);
+        document.getElementById("result").innerHTML = `データ読み込み完了！（${items.length}件）`;
         document.getElementById("gachaBtn").disabled = false;
     })
     .catch(err => {
