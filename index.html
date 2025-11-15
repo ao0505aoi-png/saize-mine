@@ -26,7 +26,7 @@
 
 <script>
 // -----------------------------
-// ★ 固定するスプレッドシート URL（あなたの正しいCSV URLに差し替え）
+// ★ 固定するスプレッドシート URL
 // -----------------------------
 const FIXED_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSKqsI81JSubHb3Sdh-9HVDe-cV9yHzlsfLt1fw8oH-zb-cVC1Dv8dcBsZLlQRc4KHtyHtqSmeJ8gjV/pub?output=csv";
 
@@ -39,31 +39,34 @@ function loadCSV() {
     .then(text => {
         const lines = text.trim().split("\n");
         
-        // ★ ヘッダー行をログ出力して確認
-        console.log("CSVヘッダー:", lines[0]);
+        // ★デバッグ：ヘッダーと最初のデータ行を確認
+        console.log("ヘッダー:", lines[0]);
+        console.log("1行目データ:", lines[1]);
         
         items = lines.slice(1).map(line => {
             const cols = line.split(",");
             
-            // ★ 各行もログ出力して確認
-            console.log("行データ:", cols);
+            // ★デバッグ：分割結果を確認
+            console.log("分割結果:", cols);
             
-            // ★★★ ここを修正：CSVの列順に合わせる ★★★
-            // 例: もし列順が「商品番号, 商品名, 価格」なら
-            // const [code, name, price] = cols;
+            const [id, product_no, name, price, category] = cols;
             
-            // 例: もし列順が「商品名, 価格, 商品番号」なら（現在のコード）
-            const [name, price, code] = cols;
-            
-            return { 
+            const item = { 
+                id: id?.trim() || "",
+                product_no: product_no?.trim() || "",
                 name: name?.trim() || "", 
-                price: Number(price) || 0, 
-                code: code?.trim() || "" 
+                price: Number(price?.trim()) || 0, 
+                category: category?.trim() || ""
             };
+            
+            // ★デバッグ：作成されたアイテム
+            console.log("アイテム:", item);
+            
+            return item;
         });
 
-        console.log("読み込んだアイテム:", items);
-        document.getElementById("result").innerHTML = `データ読み込み完了！（${items.length}件）`;
+        console.log("全アイテム:", items);
+        document.getElementById("result").innerHTML = `データ読み込み完了！(${items.length}件)`;
         document.getElementById("gachaBtn").disabled = false;
     })
     .catch(err => {
@@ -121,7 +124,9 @@ function runGacha() {
     let html = "<h3>ガチャ結果（1000円ぴったり）</h3><ul>";
 
     combo.forEach(item => {
-        html += `<li>${item.code} ${item.name} ${item.price}円</li>`;
+        // ★デバッグ出力
+        console.log("表示アイテム:", item);
+        html += `<li>${item.product_no} ${item.name} ${item.price}円</li>`;
     });
 
     html += "</ul>";
