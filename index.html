@@ -128,18 +128,14 @@ function findExact1000Combination() {
         }
     }
 
+    //パターン確認用（returnより前に移動）
+    console.log(`全メニュー数: ${n}`);
+    console.log(`1000円ぴったりの組み合わせ: ${results.length}パターン`);
+    
     // 組み合わせがない場合
     if (results.length === 0) return null;
 
     // ランダムに1つ返す
-    return results[Math.floor(Math.random() * results.length)];
-
-    //パターン確認用
-    console.log(`全メニュー数: ${n}`);
-    console.log(`1000円ぴったりの組み合わせ: ${results.length}パターン`);
-    
-    if (results.length === 0) return null;
-    
     return results[Math.floor(Math.random() * results.length)];
 }
 
