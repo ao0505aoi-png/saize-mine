@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>1000円ガチャ（個人用）</title>
+<style>
+  :root{font-family: -apple-system, "Helvetica Neue", "Segoe UI", Roboto, Noto Sans JP, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;}
+  body{margin:0;background:#fff;color:#111;line-height:1.5;padding:16px;display:flex;flex-direction:column;min-height:100vh;box-sizing:border-box;}
+  header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  h1{font-size:18px;margin:0;}
+  .card{background:#fafafa;border-radius:12px;padding:14px;box-shadow: 0 2px 8px rgba(0,0,0,0.04);margin-bottom:12px;}
+  #result-area{min-height:160px; display:flex;flex-direction:column;gap:8px;}
+  .item-row{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:8px;background:white;border:1px solid #eee;}
+  .item-left{display:flex;flex-direction:column;}
+  .product_no{font-size:12px;color:#666;}
+  .name{font-weight:600;}
+  .price{font-weight:700;}
+  .total{font-size:20px;font-weight:800;text-align:center;padding:8px 0;}
+  .controls{display:flex;gap:8px;justify-content:center;margin-top:12px;}
+  button{appearance:none;border:0;padding:12px 16px;border-radius:10px;font-weight:700;cursor:pointer;}
+  .btn-primary{background:#2ecc71;color:white;}
+  .btn-secondary{background:#f0f0f0;}
+  .small{font-size:13px;padding:8px 10px;border-radius:8px;}
+  footer{margin-top:auto;font-size:12px;color:#666;text-align:center;padding:12px 0;}
+  .hint{font-size:13px;color:#666;margin-bottom:8px;}
+  .center{display:flex;justify-content:center;align-items:center;}
+  @media (min-width:420px){body{padding:24px}}
+  .loading{opacity:0.7;font-size:14px}
+  .error{color:#c0392b}
+</style>
+</head>
+<body>
+  <header>
+    <h1>1000円ガチャ（個人用）</h1>
+    <div style="font-size:12px;color:#666">匿名で利用</div>
+  </header>
+
+  <div class="card">
+    <div class="hint">表示対象は <strong>合計1000円以内</strong> の組み合わせ（同一商品は重複しません）。データは Google スプレッドシートから読み込みます。</div>
+
+    <div style="margin-bottom:8px;">
+      <label style="font-size:13px;color:#444">公開CSV URL（Google スプレッドシート）</label>
+      <input id="csv-url" type="text" placeholder="https://docs.google.com/spreadsheets/d/e/2PACX-1vSKqsI81JSubHb3Sdh-9HVDe-cV9yHzlsfLt1fw8oH-zb-cVC1Dv8dcBsZLlQRc4KHtyHtqSmeJ8gjV/pub?output=csv" style="width:100%;padding:8px;margin-top:6px;border-radius:8px;border:1px solid #ddd" />
+    </div>
+
+    <div class="center">
+      <button id="load-btn" class="btn-primary">データ読み込み</button>
+    </div>
+
+    <div id="status" style="margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <div id="result-area">
+      <div style="text-align:center;color:#888">まだガチャを回していません。まずデータを読み込んでください。</div>
+    </div>
+
+    <div class="controls">
+      <button id="spin-btn" class="btn-primary small" disabled>ガチャを回す</button>
+      <button id="reload-btn" class="btn-secondary small" disabled>もう一度読み込み</button>
+    </div>
+
+    <div style="margin-top:8px;text-align:center;font-size:12px;color:#666">表示：商品名・商品番号・個別価格。合計が1000円以下の組合せをランダム表示します。</div>
+  </div>
+
+  <footer>作成者: あなた（個人利用向け）</footer>
+
+<script>
+/*
+  How to use:
+  1) Google Spreadsheet を CSV 公開して得た URL を入力欄に貼る（例: https://docs.google.com/spreadsheets/d/XXXXX/gviz/tq?tqx=out:csv&sheet=Sheet1）
+  2) 「データ読み込み」→「ガチャを回す」
+*/
+
+// ---- CONFIG ----
+const MAX_TOTAL = 1000;      // 上限 1000 円
+const MAX_COMBOS_SAFE = 50000; // 列挙コンボの上限（安全策）
+// -----------------
+
+const el = {
+  csvUrl: document.getElementById('csv-url'),
+  loadBtn: document.getElementById('load-btn'),
+  status: document.getElementById('status'),
+  spinBtn: document.getElementById('spin-btn'),
+  reloadBtn: document.getElementById('reload-btn'),
+  resultArea: document.getElementById('result-area')
+};
+
+let ITEMS = [];     // {id, product_no, name, price, category}
+let COMBOS = [];    // 配列の配列（各組合せは商品オブジェクトの配列）
+
+function setStatus(text, isError = false) {
+  el.status.innerHTML = text ? '<div class="'+(isError ? 'error' : 'loading')+'">'+text+'</div>' : '';
+}
+
+function parseCSV(text) {
+  // シンプルな CSV パーサ（基本的にカンマに改行のみを想定）
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(',').map(h => h.trim());
+  const rows = lines.slice(1).map(line=>{
+    // 簡易対応：カンマがフィールド内に入らない前提
+    const cols = line.split(',').map(c=>c.trim());
+    const obj = {};
+    headers.forEach((h,i)=>obj[h]=cols[i]!==undefined?cols[i]:'');
+    return obj;
+  });
+  return rows;
+}
+
+function normalizeItems(rows) {
+  const items = [];
+  const seenProductNo = new Set();
+  for (const r of rows) {
+    const product_no = (r.product_no || r.product_no===0) ? String(r.product_no).trim() : '';
+    const name = (r.name || '').trim();
+    const priceRaw = (r.price || '').toString().replace(/[^0-9\-]/g,'').trim();
+    const price = priceRaw ? parseInt(priceRaw,10) : NaN;
+    if (!product_no || !name || isNaN(price)) {
+      // skip invalid row
+      continue;
+    }
+    if (seenProductNo.has(product_no)) {
+      // duplicate product_no -> skip duplicate & log
+      console.warn('duplicate product_no skipped:', product_no, name);
+      continue;
+    }
+    seenProductNo.add(product_no);
+    items.push({
+      id: r.id || '',
+      product_no,
+      name,
+      price,
+      category: r.category || ''
+    });
+  }
+  // sort by price ascending (optional, helps pruning)
+  items.sort((a,b)=>a.price - b.price);
+  return items;
+}
+
+// バックトラックで全組合せ（合計 <= MAX_TOTAL）を列挙（重複アイテムなし）
+function generateAllCombos(items, limit = MAX_TOTAL, maxCombos = MAX_COMBOS_SAFE) {
+  const results = [];
+  const n = items.length;
+  function helper(start, comb, total) {
+    if (total <= limit && comb.length > 0) {
+      results.push({ items: comb.slice(), total });
+      if (results.length > maxCombos) {
+        return true; // signal overflow
+      }
+    }
+    for (let i = start; i < n; i++) {
+      const it = items[i];
+      const newTotal = total + it.price;
+      if (newTotal > limit) {
+        // since items are price-sorted ascending, skip further items at this level
+        continue;
+      }
+      comb.push(it);
+      const overflow = helper(i+1, comb, newTotal);
+      comb.pop();
+      if (overflow) return true;
+    }
+    return false;
+  }
+  const overflow = helper(0, [], 0);
+  return { results, overflow };
+}
+
+// フォールバック：列挙が爆発したらランダムサンプリングで候補を作る
+function generateRandomCombos(items, limit = MAX_TOTAL, attempts = 20000) {
+  const set = new Set();
+  const combos = [];
+  const n = items.length;
+  const idxs = items.map((_,i)=>i);
+  for (let a=0; a<attempts; a++) {
+    // ランダム順にシャッフルして、頭から取る（貪欲）
+    for (let j = n-1; j>0; j--) {
+      const k = Math.floor(Math.random()*(j+1));
+      const t = idxs[j]; idxs[j]=idxs[k]; idxs[k]=t;
+    }
+    let total=0, chosen=[];
+    for (let i=0;i<n;i++){
+      const it = items[idxs[i]];
+      if (total + it.price <= limit) {
+        // 50% の確率で取る（ランダム性向上）
+        if (Math.random() < 0.5) {
+          total += it.price;
+          chosen.push(it);
+        }
+      }
+    }
+    if (chosen.length===0) continue;
+    // key化して重複排除（product_no をソートして key）
+    const key = chosen.map(c=>c.product_no).sort().join('|');
+    if (!set.has(key)) {
+      set.add(key);
+      combos.push({ items: chosen.slice(), total });
+    }
+    if (combos.length >= 2000) break; // enough
+  }
+  return combos;
+}
+
+function showCombo(combo) {
+  el.resultArea.innerHTML = '';
+  // show each item
+  combo.items.forEach(it=>{
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.innerHTML = '<div class="item-left"><div class="name">'+escapeHtml(it.name)+'</div><div class="product_no">商品番号: '+escapeHtml(it.product_no)+'</div></div><div class="price">'+formatYen(it.price)+'</div>';
+    el.resultArea.appendChild(row);
+  });
+  const totalDiv = document.createElement('div');
+  totalDiv.className = 'total';
+  totalDiv.textContent = '合計: ' + formatYen(combo.total);
+  el.resultArea.appendChild(totalDiv);
+}
+
+function escapeHtml(s){ return s.replace(/[&<>"']/g, (m)=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function formatYen(n){ return n.toLocaleString() + ' 円'; }
+
+async function loadCsvUrl(url) {
+  setStatus('データを取得中…');
+  try {
+    const res = await fetch(url, {cache: "no-store"});
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text);
+    const items = normalizeItems(rows);
+    if (items.length === 0) {
+      setStatus('取得したデータに有効な行がありません。ヘッダや price の形式を確認してください。', true);
+      return false;
+    }
+    ITEMS = items;
+    setStatus('データ読み込み完了。商品数: ' + ITEMS.length);
+    return true;
+  } catch (err) {
+    console.error(err);
+    setStatus('データ取得に失敗しました: ' + err.message, true);
+    return false;
+  }
+}
+
+function prepareCombosAndEnable() {
+  setStatus('1000円以内の組み合わせを生成しています…（処理が重い場合は時間がかかることがあります）');
+  COMBOS = [];
+  // try full enumeration (with safe limit)
+  const start = Date.now();
+  const { results, overflow } = generateAllCombos(ITEMS, MAX_TOTAL, MAX_COMBOS_SAFE);
+  if (!overflow) {
+    COMBOS = results;
+    setStatus('組合せを全列挙しました: ' + COMBOS.length + ' 通り（処理時間 ' + (Date.now()-start) + ' ms）');
+  } else {
+    // fallback to random sampling
+    const fallback = generateRandomCombos(ITEMS, MAX_TOTAL, 30000);
+    COMBOS = fallback;
+    setStatus('組合せ数が多すぎたためサンプリングで候補を作成しました: ' + COMBOS.length + ' 通り（処理時間 ' + (Date.now()-start) + ' ms）');
+  }
+  if (COMBOS.length === 0) {
+    el.spinBtn.disabled = true;
+    el.reloadBtn.disabled = false;
+    el.resultArea.innerHTML = '<div class="error">1000円以内の組み合わせが見つかりませんでした。データを確認してください。</div>';
+  } else {
+    el.spinBtn.disabled = false;
+    el.reloadBtn.disabled = false;
+    el.resultArea.innerHTML = '<div style="text-align:center;color:#666">準備完了。ガチャを回して下さい。</div>';
+  }
+}
+
+function pickRandomCombo() {
+  if (COMBOS.length === 0) return null;
+  const idx = Math.floor(Math.random() * COMBOS.length);
+  return COMBOS[idx];
+}
+
+el.loadBtn.addEventListener('click', async ()=>{
+  const url = el.csvUrl.value.trim();
+  if (!url) { setStatus('CSV の URL を入力してください', true); return; }
+  el.loadBtn.disabled = true;
+  const ok = await loadCsvUrl(url);
+  el.loadBtn.disabled = false;
+  if (ok) {
+    prepareCombosAndEnable();
+  }
+});
+
+el.reloadBtn.addEventListener('click', async ()=>{
+  const url = el.csvUrl.value.trim();
+  if (!url) { setStatus('CSV の URL を入力してください', true); return; }
+  el.reloadBtn.disabled = true;
+  el.spinBtn.disabled = true;
+  await loadCsvUrl(url);
+  prepareCombosAndEnable();
+  el.reloadBtn.disabled = false;
+});
+
+el.spinBtn.addEventListener('click', ()=>{
+  el.spinBtn.disabled = true;
+  setStatus('抽選中…');
+  // small animation feel: pick a few times then show final
+  let rounds = 8;
+  const timer = setInterval(()=>{
+    const combo = pickRandomCombo();
+    if (combo) showCombo(combo);
+    rounds--;
+    if (rounds <= 0) {
+      clearInterval(timer);
+      setStatus('');
+      el.spinBtn.disabled = false;
+    }
+  }, 120);
+});
+
+</script>
+</body>
+</html>
