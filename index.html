@@ -72,7 +72,6 @@
 // -----------------------------
 // ★ 固定するスプレッドシート URL
 // -----------------------------
-// ★★ ここを変更：末尾を pub?output=csv に ★★
 const FIXED_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSKqsI81JSubHb3Sdh-9HVDe-cV9yHzlsfLt1fw8oH-zb-cVC1Dv8dcBsZLlQRc4KHtyHtqSmeJ8gjV/pub?output=csv";
 
 let items = []; // 商品データ格納
@@ -104,37 +103,40 @@ function loadCSV() {
 
 
 // -----------------------------
-// ★ ちょうど1000円になる組み合わせを計算
+// ★ ちょうど1000円になる組み合わせを計算（商品重複OK）
 // -----------------------------
 function findExact1000Combination() {
     const target = 1000;
     const n = items.length;
-    let results = [];
-
-    // 全ての組み合わせを探索（ビット全探索）
-    for (let mask = 1; mask < (1 << n); mask++) {
-        let sum = 0;
-        let combo = [];
-
+    
+    // dp[金額] = その金額を作る方法の配列
+    const dp = Array(target + 1).fill(null).map(() => []);
+    dp[0] = [[]]; // 0円は空の組み合わせ
+    
+    // 各金額について、全商品を試す
+    for (let price = 0; price <= target; price++) {
+        if (dp[price].length === 0) continue;
+        
         for (let i = 0; i < n; i++) {
-            if (mask & (1 << i)) {
-                sum += items[i].price;
-                combo.push(items[i]);
+            const newPrice = price + items[i].price;
+            if (newPrice <= target) {
+                // 既存の組み合わせに商品を追加
+                for (const combo of dp[price]) {
+                    dp[newPrice].push([...combo, items[i]]);
+                }
             }
         }
-
-        if (sum === target) {
-            results.push(combo);
-        }
     }
-
-    //パターン確認用（returnより前に移動）
+    
+    const results = dp[target];
+    
+    //パターン確認用
     console.log(`全メニュー数: ${n}`);
     console.log(`1000円ぴったりの組み合わせ: ${results.length}パターン`);
     
     // 組み合わせがない場合
     if (results.length === 0) return null;
-
+    
     // ランダムに1つ返す
     return results[Math.floor(Math.random() * results.length)];
 }
