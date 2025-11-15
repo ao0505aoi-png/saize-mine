@@ -34,6 +34,8 @@
   #gachaBtn {
     font-size: 24px;
     padding: 30px 60px;
+    width: 100%;
+    box-sizing: border-box;
   }
   #result { 
     margin-top: 20px; 
@@ -61,7 +63,7 @@
 
 <h2>🍝 サイゼリヤ1000円ガチャ（個人用）</h2>
 
-<p>※データは固定のスプレッドシート（CSV）から読み込みます。</p>
+<!-- <p>※データは固定のスプレッドシート（CSV）から読み込みます。</p> -->
 
 <button id="gachaBtn" class="btn" disabled>🎰 ガチャを回す</button>
 
@@ -154,7 +156,7 @@ function runGacha() {
         return;
     }
 
-    let html = "<h3>🎉 ガチャ結果（1000円ぴったり）</h3><ul>";
+    let html = "<h3>🎉 ガチャ結果（1000円）</h3><ul>";
     let total = 0;
 
     combo.forEach(item => {
